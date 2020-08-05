@@ -1,28 +1,32 @@
-# If a ServiceMonitor is defined with selectors, ensure that there exists a Service with labels that the ServiceMonitor matches.
+# @title ServiceMonitors must be able to match their Services
+#
+# ServiceMonitors that define selectors must be able to match a Service.
+#
+# @kinds monitoring.coreos.com/ServiceMonitor
 package main
 
+import data.lib.combine
+
 deny[msg] {
-    resources := input[_][_]
-    resources.kind == "ServiceMonitor"
+    resource := combine.resources[_]
+    resource.kind == "ServiceMonitor"
 
     # Do not consider the kube-system namespace for evaluation.
     # These Services are created by Rancher.
-    resources.metadata.namespace != "kube-system"
+    resource.metadata.namespace != "kube-system"
 
-    not excluded_monitor(resources)
-    not service_labels_exist(resources.metadata.namespace, resources.spec.selector.matchLabels)
+    not excluded_monitor(resource)
+    not service_labels_exist(resource.metadata.namespace, resource.spec.selector.matchLabels)
 
-    msg := sprintf("%v/%v: Contains Service selectors that do not match any Services", [resources.kind, resources.metadata.name])
+    msg := sprintf("%v/%v: Contains Service selectors that do not match any Services", [resource.kind, resource.metadata.name])
 }
 
 service_labels_exist(namespace, matchLabels) {
-    resources := input[_][_]
-    resources.kind == "Service"
-    resources.metadata.namespace == namespace
+    resource := combine.resources[_]
 
-    matches := {k: v | v := matchLabels[k]; resources.metadata.labels[k] == v}
-
-    count(matchLabels) == count(matches)
+    resource.kind == "Service"
+    resource.metadata.namespace == namespace
+    combine.is_subset(matchLabels, resource.metadata.labels)
 }
 
 # Both the prometheus and the alertmanager ServiceMonitors reference Services that

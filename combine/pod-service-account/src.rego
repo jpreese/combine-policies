@@ -1,19 +1,26 @@
-# If a resource depends on a ServiceAccount, ensure that the ServiceAccount exists.
+# @title Dependent ServiceAccount exists
+#
+# If a resource depends on a ServiceAccount by setting the
+# template.spec.serviceAccountName field, the named ServiceAccount must exist.
+#
+# @kinds apps/DaemonSet apps/Deployment apps/StatefulSet core/Pod
 package main
 
+import data.lib.combine
+
 deny[msg] {
-    resources := input[_][_]
-    serviceAccount := resources.spec.template.spec.serviceAccountName
+    resource := combine.resources[_]
+    serviceAccount := resource.spec.template.spec.serviceAccountName
 
-    not service_account_exists(resources.metadata.namespace, serviceAccount)
+    not service_account_exists(resource.metadata.namespace, serviceAccount)
 
-    msg := sprintf("%v/%v: References ServiceAccount %v/%v which was not found", [resources.kind, resources.metadata.name, resources.metadata.namespace, serviceAccount])
+    msg := sprintf("%v/%v: References ServiceAccount %v/%v which was not found", [resource.kind, resource.metadata.name, resource.metadata.namespace, serviceAccount])
 }
 
 service_account_exists(namespace, serviceAccount) {
-    resources := input[_][_]
-    resources.kind == "ServiceAccount"
+    resource := combine.resources[_]
 
-    resources.metadata.namespace == namespace
-    resources.metadata.name == serviceAccount
+    resource.kind == "ServiceAccount"
+    resource.metadata.namespace == namespace
+    resource.metadata.name == serviceAccount
 }
